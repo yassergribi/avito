@@ -13,7 +13,7 @@ from marketplace.serializers import AddItemSerializer, AddItemToFavSerializer, C
 # Create your views here.
 
 class ProfilViewSet(ModelViewSet):
-    queryset = Profil.objects.all()
+    queryset = Profil.objects.select_related('user').all()
     serializer_class = ProfilSerializer
 
     @action(detail=False, methods=['GET', 'PUT'], permission_classes = [IsAuthenticated])
@@ -36,12 +36,11 @@ class CategoryViewSet(ModelViewSet):
 
     
 class FavoriteViewSet(ModelViewSet):
-    queryset = Favorite.objects.all()
 
-    @action(detail=False, methods=['GET', 'PUT'], permission_classes = [IsAuthenticated])
+    #@action(detail=False, methods=['GET', 'PUT'], permission_classes = [IsAuthenticated])
     def get_queryset(self):
         user_id = self.kwargs['profil_pk']
-        return Favorite.objects.filter(user_id=user_id).all()
+        return Favorite.objects.select_related('item__category', 'item__seller__user').filter(user_id=user_id).all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
@@ -55,7 +54,7 @@ class FavoriteViewSet(ModelViewSet):
 class ItemViewSet(ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
 
-    queryset = Item.objects.all()
+    queryset = Item.objects.select_related('seller__user','category').all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
