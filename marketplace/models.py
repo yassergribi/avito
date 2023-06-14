@@ -20,15 +20,23 @@ class Category(models.Model):
 
     def __str__(self):
         return self.title
+    
+    class Meta:
+        ordering = ['title']
 
 
 class Item(models.Model):
     title = models.CharField(max_length= 255)
-    description = models.TextField()
+    slug = models.SlugField()
+    description = models.TextField(null=True, blank = True)
     price = models.DecimalField(max_digits=8, decimal_places=2)
+    last_update = models.DateTimeField(auto_now=True)
     seller = models.ForeignKey(Profil, on_delete=models.CASCADE)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='items')
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name='items')
 
+    def __str__(self):
+        return self.title
+    
 
 class Favorite(models.Model):
     user = models.ForeignKey(Profil, on_delete=models.CASCADE)

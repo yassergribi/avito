@@ -7,10 +7,13 @@ from pprint import pprint
 router = routers.DefaultRouter()
 router.register('items',views.ItemViewSet, basename='items')
 router.register('categories',views.CategoryViewSet)
-router.register('profils',views.ProfilViewSet)
+router.register('profils',views.ProfilViewSet, basename='profils')
 
 
-products_router =  routers.NestedDefaultRouter(router, 'items', lookup='item')
+items_router =  routers.NestedDefaultRouter(router, 'items', lookup='item')
+
+profils_router =  routers.NestedDefaultRouter(router, 'profils', lookup='profil')
+profils_router.register('favorites',views.FavoriteViewSet, basename='profil-favorites' )
 
 
-urlpatterns = router.urls + products_router.urls
+urlpatterns = router.urls + items_router.urls + profils_router.urls
