@@ -41,7 +41,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
-    seller = SimpleProfilSerializer()
+    seller = SimpleProfilSerializer(read_only= True)
     category = serializers.SerializerMethodField()
 
     class Meta:
@@ -51,33 +51,21 @@ class ItemSerializer(serializers.ModelSerializer):
     def get_category(self, item:Item):
         return item.category.title
 
-class AddItemSerializer(serializers.ModelSerializer):
-    seller_id = serializers.IntegerField(read_only = True)
-
-    class Meta:
-        model = Item
-        fields = ['id','title','description','price','seller_id','category']
-
-    def create(self, validated_data):
-        user_id = self.context['request'].user.id
-        seller_id = Profil.objects.get(user_id=user_id).id
-        return Item.objects.create(seller_id=seller_id , **validated_data)
-
-
 class UpdateItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
         fields = ['title','description','price']
 
-class AddItemToFavSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(read_only = True)
+class AddItemSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Favorite
-        fields = ['id', 'user_id', 'item']
+        model = Item
+        fields = ['id','title','description','price','category']
 
     def create(self, validated_data):
-        user_id = self.context['profil_id']
-        return Favorite.objects.create(user_id=user_id, **validated_data)
+        user = self.context['request'].user
+        seller = Profil.objects.get(user=user)
+        return Item.objects.create(seller=seller , **validated_data)
+    
 
 
 class FavoriteItemsSerializer(serializers.ModelSerializer):
@@ -85,3 +73,21 @@ class FavoriteItemsSerializer(serializers.ModelSerializer):
     class Meta:
         model = Favorite
         fields = ['id','item']
+
+class AddItemToFavSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Favorite
+        fields = ['id', 'item']
+
+    def validate(self, attrs):
+        customer = Profil.objects.get(user = self.context['request'].user)
+        if Favorite.objects.filter(item = attrs['item'], customer = customer ).exists():
+            raise serializers.ValidationError('This item already exists in favorite items.')
+        return super().validate(attrs)    
+
+    def create(self, validated_data):
+        current_user = self.context['request'].user
+        profil = Profil.objects.get(user = current_user)
+        return Favorite.objects.create(customer = profil, **validated_data)
+
+
