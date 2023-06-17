@@ -39,11 +39,8 @@ class Item(models.Model):
     
 
 class Favorite(models.Model):
-    customer = models.ForeignKey(Profil, on_delete=models.CASCADE)
+    user = models.ForeignKey(Profil, on_delete=models.CASCADE)
     item = models.ForeignKey(Item, on_delete=models.CASCADE) 
-
-    class Meta:
-        unique_together = [['customer', 'item']]
 
 class Image(models.Model):
     item = models.ForeignKey(Item, on_delete= models.CASCADE, related_name = 'images')
