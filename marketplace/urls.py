@@ -14,6 +14,7 @@ items_router =  routers.NestedDefaultRouter(router, 'items', lookup='item')
 
 profils_router =  routers.NestedDefaultRouter(router, 'profils', lookup='profil')
 profils_router.register('favorites',views.FavoriteViewSet, basename='profil-favorites' )
+profils_router.register('myoffers',views.MyOffersViewSet, basename='profil-myoffers' )
 
 
 urlpatterns = router.urls + items_router.urls + profils_router.urls
