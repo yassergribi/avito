@@ -9,10 +9,12 @@ class ProfilSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     first_name = serializers.SerializerMethodField()
     last_name =  serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField(read_only = True)
+    last_update = serializers.DateTimeField(read_only = True)
 
     class Meta:
         model = Profil
-        fields = ['id', 'user_id','first_name','last_name','phone','birth_date']
+        fields = ['id', 'user_id','first_name','last_name','phone','birth_date','created_at','last_update']
 
     def get_first_name(self, profil:Profil):
         return profil.user.first_name
@@ -43,10 +45,12 @@ class CategorySerializer(serializers.ModelSerializer):
 class ItemSerializer(serializers.ModelSerializer):
     seller = SimpleProfilSerializer(read_only= True)
     category = serializers.SerializerMethodField()
+    created_at = serializers.DateTimeField(read_only = True)
+    last_update = serializers.DateTimeField(read_only = True)
 
     class Meta:
         model = Item
-        fields = ['id','title','description','price','seller','category']
+        fields = ['id','title','description','price','seller','category','created_at','last_update']
 
     def get_category(self, item:Item):
         return item.category.title
