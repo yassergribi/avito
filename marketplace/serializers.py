@@ -9,6 +9,7 @@ class ProfilSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(read_only=True)
     first_name = serializers.SerializerMethodField()
     last_name =  serializers.SerializerMethodField()
+    birth_date = serializers.DateField()
     created_at = serializers.DateTimeField(read_only = True)
     last_update = serializers.DateTimeField(read_only = True)
 
