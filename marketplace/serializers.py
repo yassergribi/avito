@@ -1,30 +1,73 @@
-from dataclasses import fields
-from pyexpat import model
 from rest_framework import serializers
 from django.conf import settings
+from django.db import transaction
+from core.serializers import UserSerializer
+from core.models import User
 from .models import Category, Favorite, Item, Profil
 
 
 class ProfilSerializer(serializers.ModelSerializer):
-    user_id = serializers.IntegerField(read_only=True)
-    first_name = serializers.SerializerMethodField()
-    last_name =  serializers.SerializerMethodField()
-    birth_date = serializers.DateField()
+    user = UserSerializer()
+    birth_date = serializers.DateField(required=False)
+    phone = serializers.CharField()
     created_at = serializers.DateTimeField(read_only = True)
     last_update = serializers.DateTimeField(read_only = True)
 
     class Meta:
         model = Profil
-        fields = ['id', 'user_id','first_name','last_name','phone','birth_date','created_at','last_update']
+        fields = ['id','user','phone','birth_date','created_at','last_update']
 
-    def get_first_name(self, profil:Profil):
-        return profil.user.first_name
-    def get_last_name(self, profil:Profil):
-        return profil.user.last_name
 
+    def create(self, validated_data):
+        with transaction.atomic():
+            user_data = validated_data.pop('user')
+            if User.objects.filter(email=user_data['email']).exists():
+                    raise serializers.ValidationError("User with this email already exists.")
+            
+            if User.objects.filter(username=user_data['username']).exists():
+                    raise serializers.ValidationError("User with this username already exists.")
+                
+            user = User.objects.create(**user_data)
+            self.instance = Profil.objects.get(user=user) 
+        return super().update(self.instance, validated_data)
+        
+    
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        if user_data:
+            user_serializer = self.fields['user']
+            user_instance = instance.user
+            if 'email' in user_data and user_data['email'] != user_instance.email:
+                if User.objects.filter(email=user_data['email']).exists():
+                    raise serializers.ValidationError("User with this email already exists.")
+                user_instance.email = user_data['email']
+                user_instance.save()
+            user_instance = user_serializer.update(user_instance, user_data)
+        return super().update(instance, validated_data)
 
     
 class SimpleProfilSerializer(serializers.ModelSerializer):
+    user = user = UserSerializer()
+    class Meta:
+        model = Profil
+        fields = ['id','user','phone']
+
+    
+    def update(self, instance, validated_data):
+        user_data = validated_data.pop('user', None)
+        if user_data:
+            user_serializer = self.fields['user']
+            user_instance = instance.user
+            if 'email' in user_data and user_data['email'] != user_instance.email:
+                if User.objects.filter(email=user_data['email']).exists():
+                    raise serializers.ValidationError("User with this email already exists.")
+                user_instance.email = user_data['email']
+                user_instance.save()
+            user_instance = user_serializer.update(user_instance, user_data)
+        return super().update(instance, validated_data)
+
+    
+class SellerSerializer(serializers.ModelSerializer):
     seller_name = serializers.SerializerMethodField()
 
     class Meta:
@@ -44,7 +87,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ItemSerializer(serializers.ModelSerializer):
-    seller = SimpleProfilSerializer(read_only= True)
+    seller = SellerSerializer(read_only= True)
     category = serializers.SerializerMethodField()
     created_at = serializers.DateTimeField(read_only = True)
     last_update = serializers.DateTimeField(read_only = True)
