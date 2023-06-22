@@ -8,6 +8,7 @@ router = routers.DefaultRouter()
 router.register('items',views.ItemViewSet, basename='items')
 router.register('categories',views.CategoryViewSet)
 router.register('profils',views.ProfilViewSet, basename='profils')
+router.register('adminprofils', views.AdminProfilViewSet, basename='adminprofils')
 
 
 items_router =  routers.NestedDefaultRouter(router, 'items', lookup='item')
