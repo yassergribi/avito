@@ -1,21 +1,31 @@
-from locale import currency
-from urllib import request
 from django.db.models.aggregates import Count
 from django.shortcuts import get_object_or_404 , render
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet, ViewSet
 from rest_framework.permissions import  DjangoModelPermissions, IsAuthenticated , IsAuthenticatedOrReadOnly, AllowAny, IsAdminUser
 
 from .permissions import IsAdminOrReadOnly, IsAdminOrOwnerOrReadOnly, IsAdminOrOwner
 from .models import Category, Favorite, Item, Profil
-from .serializers import AddItemSerializer, SimpleProfilSerializer ,AddItemToFavSerializer ,CategorySerializer, FavoriteItemsSerializer, ItemSerializer, ProfilSerializer, UpdateItemSerializer
+from .serializers import AddItemSerializer, SimpleProfilSerializer, CreateProfilSerializer ,AddItemToFavSerializer ,CategorySerializer, FavoriteItemsSerializer, ItemSerializer, ProfilSerializer, UpdateItemSerializer
 
 # Create your views here.
 
 
+class CreateProfilViewSet(ViewSet):
+    serializer_class = CreateProfilSerializer
+
+    def create(self, request):
+        serializer = self.serializer_class(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=201)
+        return Response(serializer.errors, status=400)
+
+
 class AdminProfilViewSet(ModelViewSet):
+    http_method_names = ['get','patch', 'delete']
     queryset = Profil.objects.select_related('user').all()
     serializer_class = ProfilSerializer
     permission_classes = [IsAdminUser]
@@ -23,8 +33,8 @@ class AdminProfilViewSet(ModelViewSet):
 
     @action(detail=False, methods=['GET', 'PATCH', 'DELETE'], permission_classes = [IsAuthenticated])
     def me(self, request):
-        current_user = request.user
-        profil = Profil.objects.get(user= current_user)
+        #current_user = request.user
+        profil = Profil.objects.get(user= request.user)
         if request.method == 'GET':
             serializer = ProfilSerializer(profil)
             return Response(serializer.data)
@@ -39,16 +49,13 @@ class ProfilViewSet(ModelViewSet):
     http_method_names = ['get','patch', 'delete']
     queryset = Profil.objects.select_related('user').all()
     serializer_class = SimpleProfilSerializer
+    permission_classes = [IsAdminOrOwner]
 
-    def get_permissions(self):
-        if self.request.method in ['PATCH','DELETE']:
-            return [IsAdminOrOwner()]
-        return [IsAuthenticated()]
 
     @action(detail=False, methods=['GET','PATCH', 'DELETE'], permission_classes = [IsAuthenticated])
     def me(self, request):
-        current_user = request.user
-        profil = Profil.objects.get(user= current_user)
+        #current_user = request.user
+        profil = Profil.objects.get(user= request.user)
         if request.method == 'GET':
             serializer = ProfilSerializer(profil)
             return Response(serializer.data)
@@ -57,6 +64,8 @@ class ProfilViewSet(ModelViewSet):
             serializer.is_valid(raise_exception=True)
             serializer.save()
             return Response(serializer.data)
+        elif request.method == 'DELETE':
+            return Response({}, status.HTTP_204_NO_CONTENT)
 
 
 class CategoryViewSet(ModelViewSet):
@@ -77,11 +86,15 @@ class CategoryViewSet(ModelViewSet):
 
 class FavoriteViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
-    @action(detail=False, methods=['GET', 'PUT'], permission_classes = [IsAuthenticated])
+
+    @action(detail=False, methods=['GET', 'PUT'])
     def get_queryset(self):
-        current_user = self.request.user
-        return Favorite.objects.select_related('item__category', 'item__seller__user')\
-                        .filter(customer__user=current_user).all()
+        if self.request.user.is_staff and self.kwargs['profil_pk'] != 'me':
+            return Favorite.objects.select_related('item__category', 'item__seller__user')\
+                        .filter(customer= self.kwargs['profil_pk']).all()
+        else:
+            return Favorite.objects.select_related('item__category', 'item__seller__user')\
+                            .filter(customer__user=self.request.user).all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
