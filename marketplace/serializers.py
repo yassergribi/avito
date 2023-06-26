@@ -1,9 +1,33 @@
-from rest_framework import serializers
+from rest_framework import serializers 
+from django.contrib.auth.hashers import make_password
 from django.conf import settings
 from django.db import transaction
-from core.serializers import UserSerializer
+from core.serializers import UserSerializer,UserCreateSerializer
 from core.models import User
 from .models import Category, Favorite, Item, Profil
+
+
+class CreateProfilSerializer(serializers.ModelSerializer):
+    user = UserCreateSerializer()
+    class Meta:
+        model = Profil
+        fields = ['id','user','phone','birth_date']
+    
+    def create(self, validated_data):
+        with transaction.atomic():
+            user_data = validated_data.pop('user')
+            if User.objects.filter(email=user_data['email']).exists():
+                    raise serializers.ValidationError("User with this email already exists.")
+            
+            if User.objects.filter(username=user_data['username']).exists():
+                    raise serializers.ValidationError("User with this username already exists.")
+            
+            user_instance = User.objects.create(**user_data)
+            user_instance.password = make_password(user_data['password'])
+            user_instance.save()
+            self.instance = Profil.objects.get(user=user_instance) 
+        return super().update(self.instance, validated_data)
+
 
 
 class ProfilSerializer(serializers.ModelSerializer):
@@ -17,19 +41,6 @@ class ProfilSerializer(serializers.ModelSerializer):
         model = Profil
         fields = ['id','user','phone','birth_date','created_at','last_update']
 
-
-    def create(self, validated_data):
-        with transaction.atomic():
-            user_data = validated_data.pop('user')
-            if User.objects.filter(email=user_data['email']).exists():
-                    raise serializers.ValidationError("User with this email already exists.")
-            
-            if User.objects.filter(username=user_data['username']).exists():
-                    raise serializers.ValidationError("User with this username already exists.")
-                
-            user = User.objects.create(**user_data)
-            self.instance = Profil.objects.get(user=user) 
-        return super().update(self.instance, validated_data)
         
     
     def update(self, instance, validated_data):
@@ -47,7 +58,7 @@ class ProfilSerializer(serializers.ModelSerializer):
 
     
 class SimpleProfilSerializer(serializers.ModelSerializer):
-    user = user = UserSerializer()
+    user =  UserSerializer()
     class Meta:
         model = Profil
         fields = ['id','user','phone']
@@ -102,7 +113,7 @@ class ItemSerializer(serializers.ModelSerializer):
 class UpdateItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = Item
-        fields = ['title','description','price']
+        fields = ['id','title','description','price']
 
 class AddItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -111,8 +122,7 @@ class AddItemSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        seller = Profil.objects.get(user=user)
-        return Item.objects.create(seller=seller , **validated_data)
+        return Item.objects.create(seller=user.profil , **validated_data)
     
 
 
@@ -128,14 +138,13 @@ class AddItemToFavSerializer(serializers.ModelSerializer):
         fields = ['id', 'item']
 
     def validate(self, attrs):
-        customer = Profil.objects.get(user = self.context['request'].user)
-        if Favorite.objects.filter(item = attrs['item'], customer = customer ).exists():
+        current_user = self.context['request'].user
+        if Favorite.objects.filter(item = attrs['item'], customer = current_user.profil ).exists():
             raise serializers.ValidationError('This item already exists in favorite items.')
         return super().validate(attrs)    
 
     def create(self, validated_data):
         current_user = self.context['request'].user
-        profil = Profil.objects.get(user = current_user)
-        return Favorite.objects.create(customer = profil, **validated_data)
+        return Favorite.objects.create(customer = current_user.profil, **validated_data)
 
 
