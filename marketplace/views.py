@@ -1,5 +1,6 @@
 from django.db.models.aggregates import Count
 from django.shortcuts import get_object_or_404 , render
+from django.db.models import Q , F , Func , ExpressionWrapper
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.decorators import action
@@ -10,9 +11,9 @@ from rest_framework.permissions import  DjangoModelPermissions, IsAuthenticated 
 
 from .filters import ItemFilter
 from .pagination import DefaultPagination
-from .permissions import IsAdminOrReadOnly, IsAdminOrOwnerOrReadOnly, IsAdminOrOwner
-from .models import Category, Favorite, Item, Profil
-from .serializers import AddItemSerializer, SimpleProfilSerializer, CreateProfilSerializer ,AddItemToFavSerializer ,CategorySerializer, FavoriteItemsSerializer, ItemSerializer, ProfilSerializer, UpdateItemSerializer
+from .permissions import IsAdminOrReadOnly, IsTextOwner, IsAdminOrOwnerOrReadOnly, IsAdminOrOwner, IsDiscussionOwner
+from .models import Category, Favorite, Item, Profil, Discussion, Message
+from .serializers import AddItemSerializer, SendMessageSerializer , MessageSerializer , DiscussionSerializer, SimpleProfilSerializer, CreateProfilSerializer ,AddItemToFavSerializer ,CategorySerializer, FavoriteItemsSerializer, ItemSerializer, ProfilSerializer, UpdateItemSerializer
 
 # Create your views here.
 
@@ -100,20 +101,17 @@ class FavoriteViewSet(ModelViewSet):
     def get_queryset(self):
         current_user = self.request.user
         if current_user.is_staff and self.kwargs['profil_pk'] != 'me':
-            return Favorite.objects.select_related('item__category', 'item__seller__user')\
-                                   .filter(customer= self.kwargs['profil_pk']).all()
+            return Favorite.objects.filter(customer= self.kwargs['profil_pk'])\
+                                   .select_related('item__category', 'item__seller__user').all()
         else:
-            return Favorite.objects.select_related('item__category', 'item__seller__user')\
-                                   .filter(customer__user= current_user).all()
+            return Favorite.objects.filter(customer__user= current_user)\
+                                   .select_related('item__category', 'item__seller__user').all()
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return FavoriteItemsSerializer 
         else:
             return AddItemToFavSerializer
-
-    # def get_serializer_context(self):
-    #     return {'profil_id': self.kwargs['profil_pk']}
 
 class ItemViewSet(ModelViewSet):
     http_method_names = ['get', 'post', 'patch', 'delete']
@@ -136,14 +134,55 @@ class ItemViewSet(ModelViewSet):
 class OffersViewSet(ModelViewSet):
     permission_classes = [IsAuthenticated]
     def get_queryset(self):
-        return  Item.objects.select_related('seller__user','category')\
-                            .filter(seller__user = self.request.user).all()
+        return  Item.objects.filter(seller__user = self.request.user)\
+                            .select_related('seller__user','category').all()
 
     def get_serializer_class(self):
         if self.request.method == 'POST':
             return AddItemSerializer
         return ItemSerializer
 
+    
+class MessageViewSet(ModelViewSet):
+    permission_classes = [IsTextOwner]
+    serializer_class = MessageSerializer
+
+    def get_serializer_context(self):
+        return {'user' : self.request.user , 'discussion_id' : self.kwargs['discussion_pk']}
+    
+    def get_queryset(self):
+        discussion_pk = self.kwargs['discussion_pk']
+        discussion = Discussion.objects.get(id=discussion_pk)
+        current_profil = self.request.user.profil
+
+        if current_profil == discussion.receiver or current_profil == discussion.sender :
+            return Message.objects.filter(discussion=discussion)\
+                                  .select_related('discussion__receiver','sender__user')\
+                                  .prefetch_related('discussion__receiver', 'discussion__sender').all()
+        else:
+            return Message.objects.none()
+                                  
+    
+class DiscussionViewSet(ModelViewSet):
+    http_method_names = ['get', 'post']
+    permission_classes = [IsAuthenticated]
+ 
+    def get_serializer_context(self):
+        return {'user' : self.request.user }
+
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+             return SendMessageSerializer
+        return DiscussionSerializer
+
+    def get_queryset(self):
+        current_user = self.request.user 
+        return Discussion.objects.filter(Q(receiver__user = current_user) | Q(sender__user = current_user))\
+                                 .select_related('receiver__user', 'sender__user') \
+                                 .prefetch_related('message__sender__user').all()
+           
+    
 
 
 
