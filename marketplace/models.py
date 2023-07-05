@@ -1,3 +1,4 @@
+from email import message
 from django.conf import settings 
 from django.db import models
 from django.core.validators import MinValueValidator , FileExtensionValidator
@@ -80,4 +81,22 @@ class AddressUser(models.Model):
     user = models.ForeignKey(Profil, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
     last_update = models.DateTimeField(auto_now=True)
+
+
+class Discussion(models.Model):
+    receiver =  models.ForeignKey(Profil, on_delete=models.CASCADE , related_name = 'receiver')
+    sender =  models.ForeignKey(Profil, on_delete=models.CASCADE, related_name = 'sender')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_update = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [['receiver' , 'sender']]
+    
+
+class Message(models.Model):
+    discussion = models.ForeignKey(Discussion, on_delete=models.CASCADE, related_name = 'message')
+    sender =  models.ForeignKey(Profil, on_delete=models.CASCADE, related_name='sent_messages')
+    message = models.TextField(null=False, blank = False)
+    created_at = models.DateTimeField(auto_now_add= True)
+
 

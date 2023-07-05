@@ -1,10 +1,12 @@
+from email import message
 from rest_framework import serializers 
 from django.contrib.auth.hashers import make_password
+from django.db.models import Q , F , Func , ExpressionWrapper
 from django.conf import settings
 from django.db import transaction
 from core.serializers import UserSerializer,UserCreateSerializer
 from core.models import User
-from .models import Category, Favorite, Item, Profil
+from .models import Category, Favorite, Item, Profil , Discussion, Message
 
 
 class CreateProfilSerializer(serializers.ModelSerializer):
@@ -147,4 +149,80 @@ class AddItemToFavSerializer(serializers.ModelSerializer):
         current_user = self.context['request'].user
         return Favorite.objects.create(customer = current_user.profil, **validated_data)
 
+    
+class MessageSerializer(serializers.ModelSerializer):
+    sender = serializers.SerializerMethodField()
+    class Meta:
+        model = Message
+        fields = ['id','sender','message']
 
+    def get_sender(self, msg:Message):
+        return msg.sender.user.first_name
+    
+    def validate(self, attrs):
+        sender = self.context['user'].profil
+        discussion_id = self.context['discussion_id']
+            
+        try:
+            Discussion.objects.get(Q(id = discussion_id) & Q(receiver=sender) | Q(id = discussion_id) & Q(sender=sender))
+        except Discussion.DoesNotExist:
+            raise serializers.ValidationError('This message can not be sent.')
+        return super().validate(attrs)     
+    
+    def create(self, validated_data):
+        sender = self.context['user'].profil
+        discussion_id = self.context['discussion_id']
+        text = validated_data['message']
+
+        message = Message.objects.create(discussion_id=discussion_id, sender=sender, message=text)
+
+        return message
+    
+    
+
+class DiscussionSerializer(serializers.ModelSerializer):
+    message = MessageSerializer(many=True)
+    receiver = serializers.SerializerMethodField()
+    sender = serializers.SerializerMethodField()
+    class Meta:
+        model = Discussion
+        fields = ['id', 'receiver','sender', 'message']
+
+    
+    def get_receiver(self, discussion:Discussion):
+        return discussion.receiver.user.first_name
+    def get_sender(self, discussion:Discussion):
+        return discussion.sender.user.first_name
+                      
+    
+
+class SendMessageSerializer(serializers.ModelSerializer):
+    message = serializers.CharField()
+    sender = serializers.SerializerMethodField(read_only=True)
+    
+    class Meta:
+        model = Discussion
+        fields = ['id', 'receiver','sender' ,'message']
+
+    def get_sender(self, data):
+        return self.context['user'].first_name
+    
+
+    def get_unique_together_validators(self):
+        """Overriding method to disable unique together checks"""
+        return []
+    
+  
+    def create(self, validated_data):
+        sender = self.context['user'].profil
+        receiver = validated_data['receiver']
+        text = validated_data['message']
+
+        try :
+            discussion = Discussion.objects.get(Q(receiver=receiver) & Q(sender=sender) )
+            Message.objects.create(discussion=discussion, sender = sender, message=text) 
+            return discussion
+        except Discussion.DoesNotExist:
+            discussion = Discussion.objects.create(receiver=receiver, sender=sender)
+            Message.objects.create(discussion=discussion, sender = sender, message=text)   
+            return discussion
