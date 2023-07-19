@@ -164,7 +164,7 @@ class MessageViewSet(ModelViewSet):
                                   
     
 class DiscussionViewSet(ModelViewSet):
-    http_method_names = ['get', 'post']
+    http_method_names = ['get', 'post','delete']
     permission_classes = [IsAuthenticated]
  
     def get_serializer_context(self):
