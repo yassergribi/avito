@@ -22,6 +22,7 @@ admin.site.site_header = 'Avito'
 admin.site.index_title = 'Admin'
 
 urlpatterns = [
+    path('', include('core.urls')),
     path('admin/', admin.site.urls),
     path('marketplace/', include('marketplace.urls')),
     path('auth/', include('djoser.urls')),
