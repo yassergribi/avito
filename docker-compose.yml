@@ -1,0 +1,44 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:12.7-alpine
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgresql
+      - POSTGRES_DB=avito
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+
+  backend: &backend
+    build:
+      context: .
+      dockerfile : Dockerfile
+    command: bash -c "python manage.py runserver 0.0.0.0:8000"
+    #container_name: avito_services
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"  
+    environment:
+      - DB_HOST=db
+      - DB_NAME=avito
+      - DB_USER=postgres
+      - DB_PASSWORD=postgresql
+      - DB_PORT=5432
+
+  migrate:
+    <<: *backend
+    command: bash -c
+      "python manage.py migrate"
+    ports: []
+    restart: "no"
+    depends_on:
+      - backend
+  
+volumes:
+  postgres_data:
