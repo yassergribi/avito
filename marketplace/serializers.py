@@ -219,7 +219,7 @@ class SendMessageSerializer(serializers.ModelSerializer):
         text = validated_data['message']
 
         try :
-            discussion = Discussion.objects.get(Q(receiver=receiver) & Q(sender=sender) )
+            discussion = Discussion.objects.get(Q(receiver=receiver) & Q(sender=sender) | Q(receiver=sender) & Q(sender=receiver) )
             Message.objects.create(discussion=discussion, sender = sender, message=text) 
             return discussion
         except Discussion.DoesNotExist:

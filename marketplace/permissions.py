@@ -26,12 +26,11 @@ class IsTextOwner(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.user.is_anonymous:
             return False
-        elif request.method in ['GET','POST'] :
+        elif request.method in ['GET','POST','DELETE'] :
             discussion_id = view.kwargs.get('discussion_pk')
             sender = request.user.profil
             try:
-                Discussion.objects.get(Q(id = discussion_id) & Q(receiver=sender) | Q(id = discussion_id) & Q(sender=sender))
-                return True
+                Discussion.objects.filter(id = discussion_id).get(Q(receiver=sender) | Q(sender=sender))
             except Discussion.DoesNotExist:
                 return False
         return True
@@ -44,7 +43,6 @@ class IsDiscussionOwner(permissions.BasePermission):
             return None
 
     def has_permission(self, request, view):
-        # Check if the user is an admin or the original user or read only
         if request.user.is_anonymous:
             return False
         try:
